@@ -16,15 +16,13 @@ public class DwdTradeOrderPaySucDetail extends BaseSQLApp {
 
     public static void main(String[] args) {
         new DwdTradeOrderPaySucDetail().start(
-                10016,
+                10020,
                 4,
                 Constant.TOPIC_DWD_TRADE_ORDER_PAYMENT_SUCCESS
+
         );
-
     }
 
-    public void start(int i, int i1, String topicDwdTradeOrderPaymentSuccess) {
-    }
 
     @Override
     public void handle(StreamTableEnvironment tEnv) {
@@ -125,6 +123,7 @@ public class DwdTradeOrderPaySucDetail extends BaseSQLApp {
                 ")" + SQLUtil.getUpsertKafkaDDL(Constant.TOPIC_DWD_TRADE_ORDER_PAYMENT_SUCCESS));
 
         result.executeInsert(Constant.TOPIC_DWD_TRADE_ORDER_PAYMENT_SUCCESS);
+
 
 
     }

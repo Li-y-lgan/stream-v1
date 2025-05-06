@@ -16,7 +16,7 @@ import java.sql.Connection;
 import java.util.*;
 
 /**
- * @author Felix
+ * @author liyan
  * @date 2025/4/10
  * 处理主流业务数据和广播流配置数据关联后的逻辑
  */
@@ -33,7 +33,7 @@ public class TableProcessFunction extends BroadcastProcessFunction<JSONObject, T
     public void open(Configuration parameters) throws Exception {
         //将配置表中的配置信息预加载到程序configMap中
         Connection mySQLConnection = JdbcUtil.getMySQLConnection();
-        List<TableProcessDim> tableProcessDimList = JdbcUtil.queryList(mySQLConnection, "select * from gmall_2025_config.table_process_dim", TableProcessDim.class, true);
+        List<TableProcessDim> tableProcessDimList = JdbcUtil.queryList(mySQLConnection, "select * from realtime_v2.table_process_dim", TableProcessDim.class, true);
         for (TableProcessDim tableProcessDim : tableProcessDimList) {
             configMap.put(tableProcessDim.getSourceTable(),tableProcessDim);
         }

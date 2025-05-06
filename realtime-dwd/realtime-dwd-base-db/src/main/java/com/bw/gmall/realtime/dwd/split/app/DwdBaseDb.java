@@ -58,11 +58,11 @@ public class DwdBaseDb extends BaseApp {
                     }
                 }
         );
-        //jsonObjDS.print();
+        jsonObjDS.print();
 
         //TODO 使用FlinkCDC读取配置表中的配置信息
         //创建MysqlSource对象
-        MySqlSource<String> mySqlSource = FlinkSourceUtil.getMySqlSource("gmall_2025_config","table_process_dwd");
+        MySqlSource<String> mySqlSource = FlinkSourceUtil.getMySqlSource("realtime_v2","table_process_dwd");
         //读取数据 封装为流
         DataStreamSource<String> mysqlStrDS = env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "mysql_source");
         //对流中数据进行类型转换   jsonStr->实体类对象

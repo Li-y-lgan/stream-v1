@@ -36,7 +36,7 @@ public class Test01_IntervalJoin {
                 );
         //从指定的网络端口读取部门数据
         SingleOutputStreamOperator<Dept> deptDS = env
-                .socketTextStream("hadoop102", 8889)
+                .socketTextStream("cdh02", 8889)
                 .map((MapFunction<String, Dept>) lineStr -> {
                     String[] fieldArr = lineStr.split(",");
                     return new Dept(Integer.valueOf(fieldArr[0]), fieldArr[1], Long.valueOf(fieldArr[2]));

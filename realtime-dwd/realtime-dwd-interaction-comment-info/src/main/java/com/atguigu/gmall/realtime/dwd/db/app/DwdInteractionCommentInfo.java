@@ -50,8 +50,6 @@ public class DwdInteractionCommentInfo extends BaseSQLApp {
                 "FROM comment_info AS c\n" +
                 "  JOIN base_dic FOR SYSTEM_TIME AS OF c.pt AS dic\n" +
                 "    ON c.appraise = dic.dic_code");
-        joinedTable.execute().print();
-
         //TODO 将关联的结果写到kafka主题中                    ---upsert kafka连接器
         //创建动态表和要写入的主题进行映射
         tableEnv.executeSql("CREATE TABLE "+Constant.TOPIC_DWD_INTERACTION_COMMENT_INFO+" (\n" +
@@ -65,6 +63,7 @@ public class DwdInteractionCommentInfo extends BaseSQLApp {
                 "    PRIMARY KEY (id) NOT ENFORCED\n" +
                 ") " + SQLUtil.getUpsertKafkaDDL(Constant.TOPIC_DWD_INTERACTION_COMMENT_INFO));
         // 写入
+//        joinedTable.execute().print();
         joinedTable.executeInsert(Constant.TOPIC_DWD_INTERACTION_COMMENT_INFO);
     }
 

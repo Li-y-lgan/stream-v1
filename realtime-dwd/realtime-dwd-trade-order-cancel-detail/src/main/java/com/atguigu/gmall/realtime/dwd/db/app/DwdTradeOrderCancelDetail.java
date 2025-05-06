@@ -18,7 +18,7 @@ public class DwdTradeOrderCancelDetail extends BaseSQLApp {
 
     public static void main(String[] args) {
         new DwdTradeOrderCancelDetail().start(
-                10015,
+                10017,
                 4,
                 Constant.TOPIC_DWD_TRADE_ORDER_CANCEL
         );

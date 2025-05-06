@@ -129,7 +129,6 @@ public class DwdTradeOrderDetail extends BaseSQLApp {
                         "ts bigint," +
                         "primary key(id) not enforced " +
                         ")" + SQLUtil.getUpsertKafkaDDL(Constant.TOPIC_DWD_TRADE_ORDER_DETAIL));
-
         //写入
         result.executeInsert(Constant.TOPIC_DWD_TRADE_ORDER_DETAIL);
 

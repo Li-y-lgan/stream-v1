@@ -99,11 +99,11 @@ public class DimApp extends BaseApp {
                 return tp;
             }
         }).setParallelism(1);
-//        tpDs.print();
+        tpDs.print();
         return tpDs;
     }
     private SingleOutputStreamOperator<TableProcessDim> readTableProcess(StreamExecutionEnvironment env) {
-        MySqlSource<String> mySqlSource = FlinkSourceUtil.getMySqlSource("gmall_2025_config", "table_process_dim");
+        MySqlSource<String> mySqlSource = FlinkSourceUtil.getMySqlSource("realtime_v2", "table_process_dim");
         DataStreamSource<String> mysqlStrDS = env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "mysql_source");
         return mysqlStrDS.map((MapFunction<String, TableProcessDim>) jsonStr -> {
             JSONObject jsonObj = JSON.parseObject(jsonStr);
@@ -129,7 +129,7 @@ public class DimApp extends BaseApp {
                                                                                       String db = jsonObj.getString("database");
                                                                                       String type = jsonObj.getString("type");
                                                                                       String data = jsonObj.getString("data");
-                                                                                      if ("gmall_2025".equals(db)
+                                                                                      if ("realtime_v1".equals(db)
                                                                                               && ("insert".equals(type)
                                                                                               || "update".equals(type)
                                                                                               || "delete".equals(type)
@@ -142,7 +142,7 @@ public class DimApp extends BaseApp {
                                                                                   }
                                                                               }
         );
-        jsonObjDs.print();
+//        jsonObjDs.print();
         return jsonObjDs;
     }
 }

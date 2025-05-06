@@ -17,7 +17,7 @@ import java.time.Duration;
 public class DwdTradeOrderRefund extends BaseSQLApp {
     public static void main(String[] args) {
         new DwdTradeOrderRefund().start(
-                10017,
+                10010,
                 4,
                 Constant.TOPIC_DWD_TRADE_ORDER_REFUND
         );
@@ -111,7 +111,7 @@ public class DwdTradeOrderRefund extends BaseSQLApp {
                         "ts bigint ," +
                         "PRIMARY KEY (id) NOT ENFORCED " +
                         ")" + SQLUtil.getUpsertKafkaDDL(Constant.TOPIC_DWD_TRADE_ORDER_REFUND));
-        result.execute().print();
+
         result.executeInsert(Constant.TOPIC_DWD_TRADE_ORDER_REFUND);
 
 

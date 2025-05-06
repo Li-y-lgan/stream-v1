@@ -14,8 +14,8 @@ public class Constant {
     public static final String MYSQL_HOST = "cdh03";
     public static final int MYSQL_PORT = 3306;
     public static final String MYSQL_USER_NAME = "root";
-    public static final String MYSQL_PASSWORD = "zh1028,./";
-    public static final String HBASE_NAMESPACE = "gmall_2025";
+    public static final String MYSQL_PASSWORD = "root";
+    public static final String HBASE_NAMESPACE = "realtime_v1";
 
     public static final String MYSQL_DRIVER = "com.mysql.cj.jdbc.Driver";
     public static final String MYSQL_URL = "jdbc:mysql://cdh03:3306?useSSL=false";
@@ -40,7 +40,7 @@ public class Constant {
 
     public static final String TOPIC_DWD_USER_REGISTER = "dwd_user_register";
 
-    public static final String DORIS_FE_NODES = "cdh02:7030";
+    public static final String DORIS_FE_NODES = "cdh03:8030";
 
     public static final String DORIS_DATABASE = "stream-v1";
 

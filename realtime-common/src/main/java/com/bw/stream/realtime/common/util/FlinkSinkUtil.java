@@ -88,10 +88,10 @@ public class FlinkSinkUtil {
         DorisSink<String> sink = DorisSink.<String>builder()
                 .setDorisReadOptions(DorisReadOptions.builder().build())
                 .setDorisOptions(DorisOptions.builder() // 设置 doris 的连接参数
-                        .setFenodes("hadoop102:7030")
+                        .setFenodes("cdh03:8030")
                         .setTableIdentifier(Constant.DORIS_DATABASE + "." + tableName)
                         .setUsername("root")
-                        .setPassword("aaaaaa")
+                        .setPassword("root")
                         .build())
                 .setDorisExecutionOptions(DorisExecutionOptions.builder() // 执行参数
                         //.setLabelPrefix("doris-label")  // stream-load 导入的时候的 label 前缀

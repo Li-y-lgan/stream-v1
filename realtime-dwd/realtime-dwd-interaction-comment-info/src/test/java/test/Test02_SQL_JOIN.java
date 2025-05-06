@@ -32,7 +32,7 @@ public class Test02_SQL_JOIN {
         //TODO 2.检查点相关的设置(略)
         //TODO 3.从指定的网络端口读取员工数据  并转换为动态表
         SingleOutputStreamOperator<Emp> empDS = env
-                .socketTextStream("hadoop102", 8888)
+                .socketTextStream("cdh02", 8888)
                 .map((MapFunction<String, Emp>) lineStr -> {
                     String[] fieldArr = lineStr.split(",");
                     return new Emp(Integer.valueOf(fieldArr[0]), fieldArr[1], Integer.valueOf(fieldArr[2]), Long.valueOf(fieldArr[3]));
@@ -41,7 +41,7 @@ public class Test02_SQL_JOIN {
 
         //TODO 4.从指定的网络端口读取部门数据  并转换为动态表
         SingleOutputStreamOperator<Dept> deptDS = env
-                .socketTextStream("hadoop102", 8889)
+                .socketTextStream("cdh02", 8889)
                 .map((MapFunction<String, Dept>) lineStr -> {
                     String[] fieldArr = lineStr.split(",");
                     return new Dept(Integer.valueOf(fieldArr[0]), fieldArr[1], Long.valueOf(fieldArr[2]));

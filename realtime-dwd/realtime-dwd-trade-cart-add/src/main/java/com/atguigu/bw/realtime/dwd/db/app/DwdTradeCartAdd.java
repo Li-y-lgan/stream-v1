@@ -15,7 +15,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 public class DwdTradeCartAdd extends BaseSQLApp {
     public static void main(String[] args) {
         new DwdTradeCartAdd().start(
-                10013,
+                10014,
                 4,
                 Constant.TOPIC_DWD_TRADE_CART_ADD
         );
@@ -39,7 +39,7 @@ public class DwdTradeCartAdd extends BaseSQLApp {
                 "    or\n" +
                 "    (type='update' and `old`['sku_num'] is not null and (CAST(data['sku_num'] AS INT) > CAST(`old`['sku_num'] AS INT)))\n" +
                 ")");
-        cartInfo.execute().print();
+
         //TODO 将过滤出来的加购数据写到kafka主题中
         //创建动态表和要写入的主题进行映射
         tableEnv.executeSql(" create table "+Constant.TOPIC_DWD_TRADE_CART_ADD+"(\n" +
@@ -51,6 +51,7 @@ public class DwdTradeCartAdd extends BaseSQLApp {
                 "    PRIMARY KEY (id) NOT ENFORCED\n" +
                 " )" + SQLUtil.getUpsertKafkaDDL(Constant.TOPIC_DWD_TRADE_CART_ADD));
         //写入
+//        cartInfo.execute().print();
         cartInfo.executeInsert(Constant.TOPIC_DWD_TRADE_CART_ADD);
 
     }

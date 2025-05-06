@@ -1,5 +1,4 @@
 package com.atguigu.gmall.realtime.dwd.db.app;
-
 import com.bw.stream.realtime.common.base.BaseSQLApp;
 import com.bw.stream.realtime.common.constant.Constant;
 import com.bw.stream.realtime.common.util.SQLUtil;
@@ -17,7 +16,7 @@ import java.time.Duration;
 public class DwdTradeRefundPaySucDetail extends BaseSQLApp {
     public static void main(String[] args) {
         new DwdTradeRefundPaySucDetail().start(
-                10018,
+                10019,
                 4,
                 Constant.TOPIC_DWD_TRADE_REFUND_PAYMENT_SUCCESS
         );
@@ -115,7 +114,7 @@ public class DwdTradeRefundPaySucDetail extends BaseSQLApp {
                 "ts bigint ," +
                 "PRIMARY KEY (id) NOT ENFORCED " +
                 ")" + SQLUtil.getUpsertKafkaDDL(Constant.TOPIC_DWD_TRADE_REFUND_PAYMENT_SUCCESS));
-        result.execute().print();
+
         result.executeInsert(Constant.TOPIC_DWD_TRADE_REFUND_PAYMENT_SUCCESS);
 
 
