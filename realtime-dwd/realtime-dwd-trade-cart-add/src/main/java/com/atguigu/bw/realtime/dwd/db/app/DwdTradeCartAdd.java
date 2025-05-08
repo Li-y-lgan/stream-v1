@@ -51,7 +51,7 @@ public class DwdTradeCartAdd extends BaseSQLApp {
                 "    PRIMARY KEY (id) NOT ENFORCED\n" +
                 " )" + SQLUtil.getUpsertKafkaDDL(Constant.TOPIC_DWD_TRADE_CART_ADD));
         //写入
-        cartInfo.execute().print();
+
         cartInfo.executeInsert(Constant.TOPIC_DWD_TRADE_CART_ADD);
 
     }

@@ -18,17 +18,17 @@ import redis.clients.jedis.Jedis;
  */
 public class HBaseSinkFunction extends RichSinkFunction<Tuple2<JSONObject, TableProcessDim>> {
     private Connection hbaseConn;
-//    private Jedis jedis;
+    private Jedis jedis;
     @Override
     public void open(Configuration parameters) throws Exception {
         hbaseConn = HBaseUtil.getHBaseConnection();
-//        jedis = RedisUtil.getJedis();
+        jedis = RedisUtil.getJedis();
     }
 
     @Override
     public void close() throws Exception {
         HBaseUtil.closeHBaseConnection(hbaseConn);
-//        RedisUtil.closeJedis(jedis);
+        RedisUtil.closeJedis(jedis);
     }
 
     //将流中数据写出到HBase
@@ -56,7 +56,7 @@ public class HBaseSinkFunction extends RichSinkFunction<Tuple2<JSONObject, Table
         //如果维度表数据发生了变化，将Redis中缓存的数据清除掉
         if("update".equals(type)||"delete".equals(type)){
             String key = RedisUtil.getKey(sinkTable, rowKey);
-//            jedis.del(key);
+            jedis.del(key);
         }
     }
 }

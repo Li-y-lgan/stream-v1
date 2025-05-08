@@ -30,33 +30,51 @@ public class RedisUtil {
     private static JedisPool jedisPool;
     static {
         JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
-        jedisPoolConfig.setMinIdle(5);
-        jedisPoolConfig.setMaxTotal(100);
-        jedisPoolConfig.setMaxIdle(5);
+        jedisPoolConfig.setMaxTotal(200);
+        jedisPoolConfig.setMaxIdle(50);
+        jedisPoolConfig.setMinIdle(10);
         jedisPoolConfig.setBlockWhenExhausted(true);
         jedisPoolConfig.setMaxWaitMillis(2000);
         jedisPoolConfig.setTestOnBorrow(true);
-        jedisPool = new JedisPool(jedisPoolConfig,"cdh03",6379,10000);
+        String password = "123456";
+
+        jedisPool = new JedisPool(jedisPoolConfig, "cdh03", 6379 , 10000, password);
     }
 
-    //获取Jedis
-    public static Jedis getJedis(){
+    // 获取Jedis
+    public static Jedis getJedis() {
         System.out.println("~~~获取Jedis客户端~~~");
-        Jedis jedis = jedisPool.getResource();
-        return jedis;
+        try {
+            return jedisPool.getResource();
+        } catch (Exception e) {
+            System.err.println("获取 Jedis 连接失败: " + e.getMessage());
+            return null;
+        }
     }
-    //关闭Jedis
-    public static void closeJedis(Jedis jedis){
-        System.out.println("~~~获取Jedis客户端~~~");
-        if(jedis != null){
-            jedis.close();
+
+    // 关闭Jedis
+    public static void closeJedis(Jedis jedis) {
+        System.out.println("~~~关闭Jedis客户端~~~");
+        if (jedis != null) {
+            try {
+                jedis.close();
+            } catch (Exception e) {
+                System.err.println("关闭 Jedis 连接失败: " + e.getMessage());
+            }
+        }
+    }
+
+    // 关闭连接池
+    public static void closePool() {
+        if (jedisPool != null && !jedisPool.isClosed()) {
+            jedisPool.close();
         }
     }
 
     //获取异步操作Redis的连接对象
     public static StatefulRedisConnection<String,String> getRedisAsyncConnection(){
         System.out.println("~~~获取异步操作Redis的客户端~~~");
-        RedisClient redisClient = RedisClient.create("redis://hadoop102:6379/0");
+        RedisClient redisClient = RedisClient.create("redis://cdh03:6379/0");
         return redisClient.connect();
     }
     //关闭异步操作Redis的连接对象

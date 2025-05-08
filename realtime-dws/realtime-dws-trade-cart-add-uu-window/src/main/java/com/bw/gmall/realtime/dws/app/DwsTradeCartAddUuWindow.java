@@ -8,6 +8,8 @@ import com.bw.stream.realtime.common.constant.Constant;
 import com.bw.stream.realtime.common.function.BeanToJsonStrMapFunction;
 import com.bw.stream.realtime.common.util.DateFormatUtil;
 import com.bw.stream.realtime.common.util.FlinkSinkUtil;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.api.common.eventtime.SerializableTimestampAssigner;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.state.StateTtlConfig;
@@ -32,61 +34,76 @@ import org.apache.flink.util.Collector;
  * @Date 2025/5/2 15:08
  * @description:
  */
+
 public class DwsTradeCartAddUuWindow extends BaseApp {
     public static void main(String[] args) throws Exception {
         new DwsTradeCartAddUuWindow().start(
-                10024,
-                4,
+                10026,
+                1,
                 "dws_trade_cart_add_uu_window",
                 Constant.TOPIC_DWD_TRADE_CART_ADD
         );
-    }
 
+    }
     @Override
     public void handle(StreamExecutionEnvironment env, DataStreamSource<String> kafkaStrDS) {
-        // 1. 转换数据格式
+        //TODO 1.对流中的数据类型进行转换   jsonStr->jsonObj
         SingleOutputStreamOperator<JSONObject> jsonObjDS = kafkaStrDS.map(JSON::parseObject);
-
-        // 2. 指定Watermark和事件时间
+        //{"sku_num":"1","user_id":"2893","sku_id":"7","id":"10274","ts":1718111265}
+        //jsonObjDS.print();
+        //TODO 2.指定Watermark以及提取事件时间字段
         SingleOutputStreamOperator<JSONObject> withWatermarkDS = jsonObjDS.assignTimestampsAndWatermarks(
-                WatermarkStrategy.<JSONObject>forMonotonousTimestamps()
-                        .withTimestampAssigner((element, recordTimestamp) -> element.getLong("ts") * 1000)
+                WatermarkStrategy
+                        .<JSONObject>forMonotonousTimestamps()
+                        .withTimestampAssigner(
+                                new SerializableTimestampAssigner<JSONObject>() {
+                                    @Override
+                                    public long extractTimestamp(JSONObject jsonObj, long recordTimestamp) {
+                                        return jsonObj.getLong("ts") * 1000;
+                                    }
+                                }
+                        )
         );
 
-        // 3. 按照用户ID分组
-        KeyedStream<JSONObject, String> keyedDS = withWatermarkDS.keyBy(json -> json.getString("user_id"));
+//        withWatermarkDS.print();
 
-        // 4. 状态编程处理独立用户
+        //TODO 3.按照用户的id进行分组
+        KeyedStream<JSONObject, String> keyedDS
+                = withWatermarkDS.keyBy(jsonObj -> jsonObj.getString("user_id"));
+        //TODO 4.使用Flink的状态编程  判断是否为加购独立用户  这里不需要封装统计的实体类对象，直接将jsonObj传递到下游
         SingleOutputStreamOperator<JSONObject> cartUUDS = keyedDS.process(
                 new KeyedProcessFunction<String, JSONObject, JSONObject>() {
                     private ValueState<String> lastCartDateState;
 
                     @Override
-                    public void open(Configuration parameters) {
-                        ValueStateDescriptor<String> descriptor =
-                                new ValueStateDescriptor<>("lastCartDateState", String.class);
-                        descriptor.enableTimeToLive(StateTtlConfig.newBuilder(Time.days(1)).build());
-                        lastCartDateState = getRuntimeContext().getState(descriptor);
+                    public void open(Configuration parameters) throws Exception {
+                        ValueStateDescriptor<String> valueStateDescriptor
+                                = new ValueStateDescriptor<String>("lastCartDateState", String.class);
+                        valueStateDescriptor.enableTimeToLive(StateTtlConfig.newBuilder(Time.days(1)).build());
+                        lastCartDateState = getRuntimeContext().getState(valueStateDescriptor);
                     }
 
                     @Override
-                    public void processElement(JSONObject jsonObj, Context ctx, Collector<JSONObject> out) throws Exception {
-                        String lastDate = lastCartDateState.value();
-                        String currentDate = DateFormatUtil.tsToDate(jsonObj.getLong("ts") * 1000);
-
-                        if (lastDate == null || !lastDate.equals(currentDate)) {
+                    public void processElement(JSONObject jsonObj, KeyedProcessFunction<String, JSONObject, JSONObject>.Context ctx, Collector<JSONObject> out) throws Exception {
+                        //从状态中获取上次加购日期
+                        String lastCartDate = lastCartDateState.value();
+                        //获取当前这次加购日期
+                        Long ts = jsonObj.getLong("ts") * 1000;
+                        String curCartDate = DateFormatUtil.tsToDate(ts);
+                        if (StringUtils.isEmpty(lastCartDate) || !lastCartDate.equals(curCartDate)) {
                             out.collect(jsonObj);
-                            lastCartDateState.update(currentDate);
+                            lastCartDateState.update(curCartDate);
                         }
                     }
                 }
         );
 
-        // 5. 开窗处理
-        AllWindowedStream<JSONObject, TimeWindow> windowDS =
-                cartUUDS.windowAll(TumblingEventTimeWindows.of(org.apache.flink.streaming.api.windowing.time.Time.seconds(10)));
+//        cartUUDS.print();
 
-        // 6. 聚合计算（修复类型推断部分）
+        //TODO 5.开窗
+        AllWindowedStream<JSONObject, TimeWindow> windowDS
+                = cartUUDS.windowAll(TumblingEventTimeWindows.of(org.apache.flink.streaming.api.windowing.time.Time.seconds(2)));
+        //TODO 6.聚合
         SingleOutputStreamOperator<CartAddUuBean> aggregateDS = windowDS.aggregate(
                 new AggregateFunction<JSONObject, Long, Long>() {
                     @Override
@@ -96,7 +113,7 @@ public class DwsTradeCartAddUuWindow extends BaseApp {
 
                     @Override
                     public Long add(JSONObject value, Long accumulator) {
-                        return accumulator + 1;
+                        return ++accumulator;
                     }
 
                     @Override
@@ -106,23 +123,31 @@ public class DwsTradeCartAddUuWindow extends BaseApp {
 
                     @Override
                     public Long merge(Long a, Long b) {
-                        return a + b;
+                        return null;
                     }
                 },
-                // 使用显式的匿名类替代Lambda表达式
-                (AllWindowFunction<Long, CartAddUuBean, TimeWindow>) (window, values, out) -> {
-                    Long count = values.iterator().next();
-                    String stt = DateFormatUtil.tsToDateTime(window.getStart());
-                    String edt = DateFormatUtil.tsToDateTime(window.getEnd());
-                    String curDate = DateFormatUtil.tsToDate(window.getStart());
-
-                    out.collect(new CartAddUuBean(stt, edt, curDate, count));
+                new AllWindowFunction<Long, CartAddUuBean, TimeWindow>() {
+                    @Override
+                    public void apply(TimeWindow window, Iterable<Long> values, Collector<CartAddUuBean> out) throws Exception {
+                        Long cartUUCt = values.iterator().next();
+                        String stt = DateFormatUtil.tsToDateTime(window.getStart());
+                        String edt = DateFormatUtil.tsToDateTime(window.getEnd());
+                        String curDate = DateFormatUtil.tsToDate(window.getStart());
+                        out.collect(new CartAddUuBean(
+                                stt,
+                                edt,
+                                curDate,
+                                cartUUCt
+                        ));
+                    }
                 }
         );
+        //TODO 7.将聚合的结果写到Doris
+        SingleOutputStreamOperator<String> operator = aggregateDS
+                .map(new BeanToJsonStrMapFunction<>());
 
-        // 7. 输出到Doris
-        aggregateDS.print();
-        aggregateDS.map(new BeanToJsonStrMapFunction<>())
-                .sinkTo(FlinkSinkUtil.getDorisSink("dws_trade_cart_add_uu_window"));
+        operator.print();
+
+        operator.sinkTo(FlinkSinkUtil.getDorisSink("dws_trade_cart_add_uu_window"));
     }
 }

@@ -50,11 +50,14 @@ public class DwsUserUserLoginWindow extends BaseApp {
         SingleOutputStreamOperator<JSONObject> jsonObjDS = kafkaStrDS.map(JSON::parseObject);
         //TODO 2.过滤出登录行为
         SingleOutputStreamOperator<JSONObject> filterDS = jsonObjDS.filter(
-                (FilterFunction<JSONObject>) jsonObj -> {
-                    String uid = jsonObj.getJSONObject("common").getString("uid");
-                    String lastPageId = jsonObj.getJSONObject("page").getString("last_page_id");
-                    return StringUtils.isNotEmpty(uid)
-                            && ("login".equals(lastPageId) || StringUtils.isEmpty(lastPageId));
+                new FilterFunction<JSONObject>() {
+                    @Override
+                    public boolean filter(JSONObject jsonObj) throws Exception {
+                        String uid = jsonObj.getJSONObject("common").getString("uid");
+                        String lastPageId = jsonObj.getJSONObject("page").getString("last_page_id");
+                        return StringUtils.isNotEmpty(uid)
+                                && ("login".equals(lastPageId) || StringUtils.isEmpty(lastPageId));
+                    }
                 }
         );
         //filterDS.print();
@@ -64,7 +67,12 @@ public class DwsUserUserLoginWindow extends BaseApp {
                 WatermarkStrategy
                         .<JSONObject>forMonotonousTimestamps()
                         .withTimestampAssigner(
-                                (SerializableTimestampAssigner<JSONObject>) (jsonObj, recordTimestamp) -> jsonObj.getLong("ts")
+                                new SerializableTimestampAssigner<JSONObject>() {
+                                    @Override
+                                    public long extractTimestamp(JSONObject jsonObj, long recordTimestamp) {
+                                        return jsonObj.getLong("ts");
+                                    }
+                                }
                         )
         );
         //TODO 4.按照uid进行分组
@@ -75,9 +83,9 @@ public class DwsUserUserLoginWindow extends BaseApp {
                     private ValueState<String> lastLoginDateState;
 
                     @Override
-                    public void open(Configuration parameters) {
+                    public void open(Configuration parameters) throws Exception {
                         ValueStateDescriptor<String> valueStateDescriptor
-                                = new ValueStateDescriptor<>("lastLoginDateState", String.class);
+                                = new ValueStateDescriptor<String>("lastLoginDateState", String.class);
                         lastLoginDateState = getRuntimeContext().getState(valueStateDescriptor);
                     }
 
@@ -89,8 +97,8 @@ public class DwsUserUserLoginWindow extends BaseApp {
                         Long ts = jsonObj.getLong("ts");
                         String curLoginDate = DateFormatUtil.tsToDate(ts);
 
-                        long uuCt = 0L;
-                        long backCt = 0L;
+                        Long uuCt = 0L;
+                        Long backCt = 0L;
                         if (StringUtils.isNotEmpty(lastLoginDate)) {
                             //若状态中的末次登录日期不为 null，进一步判断。
                             if (!lastLoginDate.equals(curLoginDate)) {
@@ -98,7 +106,7 @@ public class DwsUserUserLoginWindow extends BaseApp {
                                 uuCt = 1L;
                                 lastLoginDateState.update(curLoginDate);
                                 //如果当天日期与末次登录日期之差大于等于8天则回流用户数backCt置为1。
-                                long day = (ts - DateFormatUtil.dateToTs(lastLoginDate)) / 1000 / 60 / 60 / 24;
+                                Long day = (ts - DateFormatUtil.dateToTs(lastLoginDate)) / 1000 / 60 / 60 / 24;
                                 if (day >= 8) {
                                     backCt = 1L;
                                 }
@@ -109,7 +117,7 @@ public class DwsUserUserLoginWindow extends BaseApp {
                             lastLoginDateState.update(curLoginDate);
                         }
 
-                        if (uuCt != 0L) {
+                        if (uuCt != 0L || backCt != 0L) {
                             out.collect(new UserLoginBean("", "", "", backCt, uuCt, ts));
                         }
                     }
@@ -117,25 +125,30 @@ public class DwsUserUserLoginWindow extends BaseApp {
         );
         //beanDS.print();
         //TODO 6.开窗
-        AllWindowedStream<UserLoginBean, TimeWindow> windowDS;
-        windowDS = beanDS.windowAll(TumblingEventTimeWindows.of(Time.seconds(10)));
+        AllWindowedStream<UserLoginBean, TimeWindow> windowDS = beanDS.windowAll(TumblingEventTimeWindows.of(Time.seconds(10)));
 
         //TODO 7.聚合
         SingleOutputStreamOperator<UserLoginBean> reduceDS = windowDS.reduce(
-                (ReduceFunction<UserLoginBean>) (value1, value2) -> {
-                    value1.setUuCt(value1.getUuCt() + value2.getUuCt());
-                    value1.setBackCt(value1.getBackCt() + value2.getBackCt());
-                    return value1;
+                new ReduceFunction<UserLoginBean>() {
+                    @Override
+                    public UserLoginBean reduce(UserLoginBean value1, UserLoginBean value2) throws Exception {
+                        value1.setUuCt(value1.getUuCt() + value2.getUuCt());
+                        value1.setBackCt(value1.getBackCt() + value2.getBackCt());
+                        return value1;
+                    }
                 },
-                (AllWindowFunction<UserLoginBean, UserLoginBean, TimeWindow>) (window, values, out) -> {
-                    UserLoginBean bean = values.iterator().next();
-                    String stt = DateFormatUtil.tsToDateTime(window.getStart());
-                    String edt = DateFormatUtil.tsToDateTime(window.getEnd());
-                    String curDate = DateFormatUtil.tsToDate(window.getStart());
-                    bean.setStt(stt);
-                    bean.setEdt(edt);
-                    bean.setCurDate(curDate);
-                    out.collect(bean);
+                new AllWindowFunction<UserLoginBean, UserLoginBean, TimeWindow>() {
+                    @Override
+                    public void apply(TimeWindow window, Iterable<UserLoginBean> values, Collector<UserLoginBean> out) throws Exception {
+                        UserLoginBean bean = values.iterator().next();
+                        String stt = DateFormatUtil.tsToDateTime(window.getStart());
+                        String edt = DateFormatUtil.tsToDateTime(window.getEnd());
+                        String curDate = DateFormatUtil.tsToDate(window.getStart());
+                        bean.setStt(stt);
+                        bean.setEdt(edt);
+                        bean.setCurDate(curDate);
+                        out.collect(bean);
+                    }
                 }
         );
         //TODO 8.将聚合结果写到Doris

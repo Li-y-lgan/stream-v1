@@ -29,6 +29,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.windowing.WindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
+import org.apache.flink.util.Collector;
 
 /**
  * @author liyan
@@ -60,9 +61,9 @@ public class DwsTrafficVcChArIsNewPageViewWindow extends BaseApp {
                     private ValueState<String> lastVisitDateState;
 
                     @Override
-                    public void open(Configuration parameters) {
+                    public void open(Configuration parameters) throws Exception {
                         ValueStateDescriptor<String> valueStateDescriptor
-                                = new ValueStateDescriptor<>("lastVisitDateState", String.class);
+                                = new ValueStateDescriptor<String>("lastVisitDateState",String.class);
                         valueStateDescriptor.enableTimeToLive(StateTtlConfig.newBuilder(Time.days(1)).build());
                         lastVisitDateState = getRuntimeContext().getState(valueStateDescriptor);
                     }
@@ -77,7 +78,7 @@ public class DwsTrafficVcChArIsNewPageViewWindow extends BaseApp {
                         //获取当前访问日期
                         Long ts = jsonObj.getLong("ts");
                         String curVisitDate = DateFormatUtil.tsToDate(ts);
-                        long uvCt = 0L;
+                        Long uvCt = 0L;
                         if(StringUtils.isEmpty(lastVisitDate) || !lastVisitDate.equals(curVisitDate)){
                             uvCt = 1L;
                             lastVisitDateState.update(curVisitDate);
@@ -112,17 +113,26 @@ public class DwsTrafficVcChArIsNewPageViewWindow extends BaseApp {
                 WatermarkStrategy
                         .<TrafficPageViewBean>forMonotonousTimestamps()
                         .withTimestampAssigner(
-                                (SerializableTimestampAssigner<TrafficPageViewBean>) (bean, recordTimestamp) -> bean.getTs()
+                                new SerializableTimestampAssigner<TrafficPageViewBean>() {
+                                    @Override
+                                    public long extractTimestamp(TrafficPageViewBean bean, long recordTimestamp) {
+                                        return bean.getTs();
+                                    }
+                                }
                         )
         );
 
         //TODO 5.分组--按照统计的维度进行分组
         KeyedStream<TrafficPageViewBean, Tuple4<String, String, String, String>> dimKeyedDS = withWatermarkDS.keyBy(
-
-                (KeySelector<TrafficPageViewBean, Tuple4<String, String, String, String>>) bean -> Tuple4.of(bean.getVc(),
-                        bean.getCh(),
-                        bean.getAr(),
-                        bean.getIsNew())
+                new KeySelector<TrafficPageViewBean, Tuple4<String, String, String, String>>() {
+                    @Override
+                    public Tuple4<String, String, String, String> getKey(TrafficPageViewBean bean) throws Exception {
+                        return Tuple4.of(bean.getVc(),
+                                bean.getCh(),
+                                bean.getAr(),
+                                bean.getIsNew());
+                    }
+                }
         );
 
         //TODO 6.开窗
@@ -137,22 +147,28 @@ public class DwsTrafficVcChArIsNewPageViewWindow extends BaseApp {
 
         //TODO 7.聚合计算
         SingleOutputStreamOperator<TrafficPageViewBean> reduceDS = windowDS.reduce(
-                (ReduceFunction<TrafficPageViewBean>) (value1, value2) -> {
-                    value1.setPvCt(value1.getPvCt() + value2.getPvCt());
-                    value1.setUvCt(value1.getUvCt() + value2.getUvCt());
-                    value1.setSvCt(value1.getSvCt() + value2.getSvCt());
-                    value1.setDurSum(value1.getDurSum() + value2.getDurSum());
-                    return value1;
+                new ReduceFunction<TrafficPageViewBean>() {
+                    @Override
+                    public TrafficPageViewBean reduce(TrafficPageViewBean value1, TrafficPageViewBean value2) throws Exception {
+                        value1.setPvCt(value1.getPvCt() + value2.getPvCt());
+                        value1.setUvCt(value1.getUvCt() + value2.getUvCt());
+                        value1.setSvCt(value1.getSvCt() + value2.getSvCt());
+                        value1.setDurSum(value1.getDurSum() + value2.getDurSum());
+                        return value1;
+                    }
                 },
-                (WindowFunction<TrafficPageViewBean, TrafficPageViewBean, Tuple4<String, String, String, String>, TimeWindow>) (stringStringStringStringTuple4, window, input, out) -> {
-                    TrafficPageViewBean pageViewBean = input.iterator().next();
-                    String stt = DateFormatUtil.tsToDateTime(window.getStart());
-                    String edt = DateFormatUtil.tsToDateTime(window.getEnd());
-                    String curDate = DateFormatUtil.tsToDate(window.getStart());
-                    pageViewBean.setStt(stt);
-                    pageViewBean.setEdt(edt);
-                    pageViewBean.setCur_date(curDate);
-                    out.collect(pageViewBean);
+                new WindowFunction<TrafficPageViewBean, TrafficPageViewBean, Tuple4<String, String, String, String>, TimeWindow>() {
+                    @Override
+                    public void apply(Tuple4<String, String, String, String> stringStringStringStringTuple4, TimeWindow window, Iterable<TrafficPageViewBean> input, Collector<TrafficPageViewBean> out) throws Exception {
+                        TrafficPageViewBean pageViewBean = input.iterator().next();
+                        String stt = DateFormatUtil.tsToDateTime(window.getStart());
+                        String edt = DateFormatUtil.tsToDateTime(window.getEnd());
+                        String curDate = DateFormatUtil.tsToDate(window.getStart());
+                        pageViewBean.setStt(stt);
+                        pageViewBean.setEdt(edt);
+                        pageViewBean.setCur_date(curDate);
+                        out.collect(pageViewBean);
+                    }
                 }
         );
         reduceDS.print();
@@ -160,7 +176,7 @@ public class DwsTrafficVcChArIsNewPageViewWindow extends BaseApp {
         //TODO 8.将聚合的结果写到Doris表
         reduceDS
                 //在向Doris写数据前，将流中统计的实体类对象转换为json格式字符串
-                .map(new BeanToJsonStrMapFunction<>())
+                .map(new BeanToJsonStrMapFunction<TrafficPageViewBean>())
                 .sinkTo(FlinkSinkUtil.getDorisSink("dws_traffic_vc_ch_ar_is_new_page_view_window"));
     }
 }

@@ -17,7 +17,7 @@ public class DwsTrafficSourceKeywordPageViewWindow extends BaseSQLApp {
 
     public static void main(String[] args) {
         new DwsTrafficSourceKeywordPageViewWindow().start(
-                10021,
+                10033,
                 4,
                 "dws_traffic_source_keyword_page_view_window"
         );

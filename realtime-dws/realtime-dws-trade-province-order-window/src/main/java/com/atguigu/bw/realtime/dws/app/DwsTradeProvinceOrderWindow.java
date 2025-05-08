@@ -41,7 +41,7 @@ public class DwsTradeProvinceOrderWindow extends BaseApp {
 
     public static void main(String[] args) throws Exception {
         new DwsTradeProvinceOrderWindow().start(
-                10020,
+                10031,
                 4,
                 "dws_trade_province_order_window",
                 Constant.TOPIC_DWD_TRADE_ORDER_DETAIL
@@ -62,6 +62,8 @@ public class DwsTradeProvinceOrderWindow extends BaseApp {
                     }
                 }
         );
+
+        jsonObjDS.print();
 
         // 2. 按键分组
         KeyedStream<JSONObject, String> orderDetailIdKeyedDS = jsonObjDS.keyBy(jsonObj -> jsonObj.getString("id"));
