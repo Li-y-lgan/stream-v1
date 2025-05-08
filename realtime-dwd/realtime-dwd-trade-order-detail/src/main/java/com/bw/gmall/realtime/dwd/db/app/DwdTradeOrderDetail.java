@@ -17,7 +17,7 @@ import java.time.Duration;
 public class DwdTradeOrderDetail extends BaseSQLApp {
 
     public static void main(String[] args) {
-        new DwdTradeOrderDetail().start(10014,4, Constant.TOPIC_DWD_TRADE_ORDER_DETAIL);
+        new DwdTradeOrderDetail().start(10013,4, Constant.TOPIC_DWD_TRADE_ORDER_DETAIL);
     }
     @Override
     public void handle(StreamTableEnvironment tableEnv) {
@@ -130,6 +130,7 @@ public class DwdTradeOrderDetail extends BaseSQLApp {
                         "primary key(id) not enforced " +
                         ")" + SQLUtil.getUpsertKafkaDDL(Constant.TOPIC_DWD_TRADE_ORDER_DETAIL));
         //写入
+
         result.executeInsert(Constant.TOPIC_DWD_TRADE_ORDER_DETAIL);
 
     }

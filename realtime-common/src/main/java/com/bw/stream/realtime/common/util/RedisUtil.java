@@ -56,7 +56,7 @@ public class RedisUtil {
     //获取异步操作Redis的连接对象
     public static StatefulRedisConnection<String,String> getRedisAsyncConnection(){
         System.out.println("~~~获取异步操作Redis的客户端~~~");
-        RedisClient redisClient = RedisClient.create("redis://hadoop102:6379/0");
+        RedisClient redisClient = RedisClient.create("redis://cdh03:6379/0");
         return redisClient.connect();
     }
     //关闭异步操作Redis的连接对象

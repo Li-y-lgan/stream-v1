@@ -40,9 +40,9 @@ public class Constant {
 
     public static final String TOPIC_DWD_USER_REGISTER = "dwd_user_register";
 
-    public static final String DORIS_FE_NODES = "cdh03:8030";
+    public static final String DORIS_FE_NODES = "cdh03:9030";
 
-    public static final String DORIS_DATABASE = "stream-v1";
+    public static final String DORIS_DATABASE = "realtime_v1";
 
 
 }

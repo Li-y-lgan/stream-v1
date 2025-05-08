@@ -52,9 +52,12 @@ public class DwsTrafficHomeDetailPageViewWindow extends BaseApp {
         SingleOutputStreamOperator<JSONObject> jsonObjDS = kafkaStrDS.map(JSON::parseObject);
         //TODO 2.过滤首页以及详情页
         SingleOutputStreamOperator<JSONObject> filterDS = jsonObjDS.filter(
-                (FilterFunction<JSONObject>) jsonObj -> {
-                    String pageId = jsonObj.getJSONObject("page").getString("page_id");
-                    return "home".equals(pageId) || "good_detail".equals(pageId);
+                new FilterFunction<JSONObject>() {
+                    @Override
+                    public boolean filter(JSONObject jsonObj) throws Exception {
+                        String pageId = jsonObj.getJSONObject("page").getString("page_id");
+                        return "home".equals(pageId) || "good_detail".equals(pageId);
+                    }
                 }
         );
         //filterDS.print();
@@ -63,7 +66,12 @@ public class DwsTrafficHomeDetailPageViewWindow extends BaseApp {
                 WatermarkStrategy
                         .<JSONObject>forMonotonousTimestamps()
                         .withTimestampAssigner(
-                                (SerializableTimestampAssigner<JSONObject>) (jsonObj, recordTimestamp) -> jsonObj.getLong("ts")
+                                new SerializableTimestampAssigner<JSONObject>() {
+                                    @Override
+                                    public long extractTimestamp(JSONObject jsonObj, long recordTimestamp) {
+                                        return jsonObj.getLong("ts");
+                                    }
+                                }
                         )
         );
         //TODO 4.按照mid进行分组
@@ -75,14 +83,14 @@ public class DwsTrafficHomeDetailPageViewWindow extends BaseApp {
                     private ValueState<String> detailLastVisitDateState;
 
                     @Override
-                    public void open(Configuration parameters) {
+                    public void open(Configuration parameters) throws Exception {
                         ValueStateDescriptor<String> homeValueStateDescriptor
-                                = new ValueStateDescriptor<>("homeLastVisitDateState", String.class);
+                                = new ValueStateDescriptor<String>("homeLastVisitDateState", String.class);
                         homeValueStateDescriptor.enableTimeToLive(StateTtlConfig.newBuilder(Time.days(1)).build());
                         homeLastVisitDateState = getRuntimeContext().getState(homeValueStateDescriptor);
 
                         ValueStateDescriptor<String> detailValueStateDescriptor
-                                = new ValueStateDescriptor<>("detailLastVisitDateState", String.class);
+                                = new ValueStateDescriptor<String>("detailLastVisitDateState", String.class);
                         detailValueStateDescriptor.enableTimeToLive(StateTtlConfig.newBuilder(Time.days(1)).build());
                         detailLastVisitDateState = getRuntimeContext().getState(detailValueStateDescriptor);
 
@@ -94,8 +102,8 @@ public class DwsTrafficHomeDetailPageViewWindow extends BaseApp {
 
                         Long ts = jsonObj.getLong("ts");
                         String curVisitDate = DateFormatUtil.tsToDate(ts);
-                        long homeUvCt = 0L;
-                        long detailUvCt = 0L;
+                        Long homeUvCt = 0L;
+                        Long detailUvCt = 0L;
 
                         if ("home".equals(pageId)) {
                             //获取首页的上次访问日期
@@ -127,26 +135,32 @@ public class DwsTrafficHomeDetailPageViewWindow extends BaseApp {
         AllWindowedStream<TrafficHomeDetailPageViewBean, TimeWindow> windowDS = beanDS.windowAll(TumblingEventTimeWindows.of(org.apache.flink.streaming.api.windowing.time.Time.seconds(10)));
         //TODO 7.聚合
         SingleOutputStreamOperator<TrafficHomeDetailPageViewBean> reduceDS = windowDS.reduce(
-                (ReduceFunction<TrafficHomeDetailPageViewBean>) (value1, value2) -> {
-                    value1.setHomeUvCt(value1.getHomeUvCt() + value2.getHomeUvCt());
-                    value1.setGoodDetailUvCt(value1.getGoodDetailUvCt() + value2.getGoodDetailUvCt());
-                    return value1;
+                new ReduceFunction<TrafficHomeDetailPageViewBean>() {
+                    @Override
+                    public TrafficHomeDetailPageViewBean reduce(TrafficHomeDetailPageViewBean value1, TrafficHomeDetailPageViewBean value2) throws Exception {
+                        value1.setHomeUvCt(value1.getHomeUvCt() + value2.getHomeUvCt());
+                        value1.setGoodDetailUvCt(value1.getGoodDetailUvCt() + value2.getGoodDetailUvCt());
+                        return value1;
+                    }
                 },
-                (AllWindowFunction<TrafficHomeDetailPageViewBean, TrafficHomeDetailPageViewBean, TimeWindow>) (window, values, out) -> {
-                    TrafficHomeDetailPageViewBean viewBean = values.iterator().next();
-                    String stt = DateFormatUtil.tsToDateTime(window.getStart());
-                    String edt = DateFormatUtil.tsToDateTime(window.getEnd());
-                    String curDate = DateFormatUtil.tsToDate(window.getStart());
-                    viewBean.setStt(stt);
-                    viewBean.setEdt(edt);
-                    viewBean.setCurDate(curDate);
-                    out.collect(viewBean);
+                new AllWindowFunction<TrafficHomeDetailPageViewBean, TrafficHomeDetailPageViewBean, TimeWindow>() {
+                    @Override
+                    public void apply(TimeWindow window, Iterable<TrafficHomeDetailPageViewBean> values, Collector<TrafficHomeDetailPageViewBean> out) throws Exception {
+                        TrafficHomeDetailPageViewBean viewBean = values.iterator().next();
+                        String stt = DateFormatUtil.tsToDateTime(window.getStart());
+                        String edt = DateFormatUtil.tsToDateTime(window.getEnd());
+                        String curDate = DateFormatUtil.tsToDate(window.getStart());
+                        viewBean.setStt(stt);
+                        viewBean.setEdt(edt);
+                        viewBean.setCurDate(curDate);
+                        out.collect(viewBean);
+                    }
                 }
         );
         //TODO 8.将聚合的结果写到Doris
         reduceDS.print();
         reduceDS
-                .map(new BeanToJsonStrMapFunction<>())
+                .map(new BeanToJsonStrMapFunction<TrafficHomeDetailPageViewBean>())
                 .sinkTo(FlinkSinkUtil.getDorisSink("dws_traffic_home_detail_page_view_window"));
     }
 }
