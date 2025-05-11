@@ -90,7 +90,7 @@ public class DimApp extends BaseApp {
 
                     @Override
                     public TableProcessDim map(TableProcessDim tp) throws Exception {
-                        //获取对配置表进行的操作的类型
+
                         String op = tp.getOp();
                         //获取Hbase中维度表的表名
                         String sinkTable = tp.getSinkTable();
